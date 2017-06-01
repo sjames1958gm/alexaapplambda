@@ -4,7 +4,10 @@ var nzappapi =  require('./nzappapi.js');
 var transactions = [];
 var initialized = false;
 var connected = false;
+
+// This is code is required for AWS lambda 
 module.exports.startClient = function(cb) {
+  // If we are still connected - simply call the callback.
   if (nzappapi.isConnected()) return cb();
   
   if (!initialized) {
@@ -16,12 +19,14 @@ module.exports.startClient = function(cb) {
         AppCommandResp: AppCommandResp
       },
       {
+        // On open call the callback
         onOpen: () => {connected = true; if (cb) cb();},
         onClose: () => (connected = false),
         onError: () => (connected = false)
       });
       initialized = true;
   } else {
+    // Re-establish connection
     nzappapi.connect({
         onOpen: () => {connected = true; if (cb) cb();},
         onClose: () => (connected = false),

@@ -186,7 +186,7 @@ const presentations_handlers = {
                 user.toLowerCase(), function(status, sessionId, response, parm) {
                     switch(status) {
                         case 0:
-                            this.emit(':ask', `User identity confirmed. Repeat your original request`);
+                            this.emit(':tell', `User identity confirmed. Repeat your original request`);
                         break;
                         case 1:
                             this.emit(':ask', `I don't recognize your identity, what is your username?`);
