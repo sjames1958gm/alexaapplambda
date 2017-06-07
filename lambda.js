@@ -14,6 +14,7 @@ var {nzos_handlers, nzos_app_id, nzos_strings} = require("./nzos");
 var {telegram_handlers, telegram_app_id, telegram_strings} = require("./telegram");
 
 exports.handler = function (event, context) {
+    console.log(JSON.stringify(event));
 
     startConnection(() => {
 
