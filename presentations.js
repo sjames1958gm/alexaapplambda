@@ -28,7 +28,7 @@ const presentations_handlers = {
     'LaunchRequest': function() {
         if (!checkConnection(this)) return;
         const {request, session} = this.event;
-        command(session.user.userId, appName, session.sessionId, 'Launch'.toLowerCase(), 
+        command(session.user.userId, "", appName, session.sessionId, 'Launch'.toLowerCase(), 
             function(status, sessionId, response, parm) {
                 switch (status) {
                     case 0:
@@ -48,8 +48,8 @@ const presentations_handlers = {
         const {request, session} = this.event;
         const name = request.intent.name;
         const device = request.intent.slots.Device.value;
-        command(session.user.userId, appName, session.sessionId, name.toLowerCase(), 
-            "", device.toLowerCase(), function(status, sessionId, response, parm) {
+        command(session.user.userId, device.toLowerCase(), appName, session.sessionId, name.toLowerCase(), 
+            "", function(status, sessionId, response, parm) {
                 switch (status) {
                     case 0:
                         this.emit(':ask', `Ok.`);
@@ -81,8 +81,8 @@ const presentations_handlers = {
                 // Assume home is set - and set document to all.
                 document = "all";
             }
-            command(session.user.userId, appName, session.sessionId, name.toLowerCase(), 
-                document, device.toLowerCase(), function(status, sessionId, response, parm) {
+            command(session.user.userId, device.toLowerCase(), appName, session.sessionId, name.toLowerCase(), 
+                document, function(status, sessionId, response, parm) {
                     switch (status) {
                         case 0:
                             this.emit(':ask', `Ok`);
@@ -110,8 +110,9 @@ const presentations_handlers = {
             this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
         }
         else {
-            command(session.user.userId, appName, session.sessionId, name.toLowerCase(), 
-                "", device.toLowerCase(), function(status, sessionId, response, parm) {
+            command(session.user.userId, device.toLowerCase(), appName, 
+                session.sessionId, name.toLowerCase(), 
+                function(status, sessionId, response, parm) {
                     switch (status) {
                         case 0:
                             this.emit(':ask', `Ok, presentation moved to ${device}`);
@@ -136,7 +137,7 @@ const presentations_handlers = {
             this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
         }
         else {
-            command(session.user.userId, appName, session.sessionId, name.toLowerCase(), 
+            command(session.user.userId, "", appName, session.sessionId, name.toLowerCase(), 
                 direction, function(status, sessionId, response, parm) {
                     switch (status) {
                         case 0:
@@ -153,7 +154,7 @@ const presentations_handlers = {
         if (!checkConnection(this)) return;
         const {request, session} = this.event;
         const name = request.intent.name;
-        command(session.user.userId, appName, session.sessionId, name.toLowerCase(), 
+        command(session.user.userId, "", appName, session.sessionId, name.toLowerCase(), 
             appName, function(status, sessionId, response, parm) {
                 switch (status) {
                     case 0:
@@ -182,7 +183,7 @@ const presentations_handlers = {
             this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
         }
         else {
-        command(session.user.userId, appName, session.sessionId, name.toLowerCase(), 
+        command(session.user.userId, "", appName, session.sessionId, name.toLowerCase(), 
                 user.toLowerCase(), function(status, sessionId, response, parm) {
                     switch(status) {
                         case 0:

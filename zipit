@@ -1,1 +1,1 @@
-zip -r myalexa.zip *
+zip -q -r myalexa.zip *

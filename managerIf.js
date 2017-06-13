@@ -44,19 +44,19 @@ module.exports.checkConnection = function(emitter) {
   return true;
 };
 
-module.exports.command = function(user, app, sessionId, intent, ...rest) {
+module.exports.command = function(user, device, app, sessionId, intent, ...rest) {
   let cb;
   if (rest.length > 0 && typeof rest[rest.length - 1] === "function") {
     cb = rest.pop();
   }
 
-  nzappapi.AppCommandReq(user, app, sessionId, intent, 
-    rest[0] || "", rest[1] || "", rest[2] || "", rest[3] || "", rest[4] || "");
+  nzappapi.AppCommandReq(user, device, app, sessionId, intent, 
+    rest[0] || "", rest[1] || "", rest[2] || "", rest[3] || "");
     
   if (cb) {
     let t = {
       sessionId,
-      timer: setInterval(() => cb(-1), 2000),
+      timer: setInterval(() => AppCommandResp(2, sessionId, "", ""), 2000),
       f: cb
     };
     transactions.push(t);

@@ -53,6 +53,7 @@
         { name: 'AppSendMarker'},
         { name: 'AppCommandReq'},
         { name: 'AppCommandResp'}
+        { name: 'AppCommandReg'}
       ]
     }
 });
