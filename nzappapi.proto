@@ -285,10 +285,9 @@ message AppCommandReq
 message AppCommandResp
 {
     // 0 - success
-    // 1 - invalid user
-    // 2 - invalid app
-    // 3 - invalid device
-    // 4 - general failure
+    // 1 - reprompt user
+    // 2 - reprompt device
+    // 3 - general failure
     required uint32 Status = 1;
     required string SessionId = 2;
     required string Response = 3;
