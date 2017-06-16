@@ -52,7 +52,7 @@
         { name: 'AppMediaStreamVolume'},
         { name: 'AppSendMarker'},
         { name: 'AppCommandReq'},
-        { name: 'AppCommandResp'}
+        { name: 'AppCommandResp'},
         { name: 'AppCommandReg'}
       ]
     }
