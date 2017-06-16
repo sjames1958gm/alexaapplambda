@@ -215,12 +215,13 @@ const nzos_handlers = {
   'Unhandled': function() {
     console.log(this.context.appName);
     if (!checkConnection(this)) return;
-    console.log("Unhandled");
-
     const {
       request,
       session
     } = this.event;
+
+    console.log(`Unhandled - ${request.intent ? request.intent.name : 'no intent'}`);
+
     const name = request.intent.name;
     const app = this.context.appName || (request.intent.slots.App ? request.intent.slots.App.value : undefined);
 

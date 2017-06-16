@@ -9,12 +9,12 @@ var startConnection = function(cb) {
 
 const Alexa = require('alexa-sdk');
 
-var {presentations_handlers, presentations_app_id, presentations_strings} = require("./presentations");
 var {nzos_handlers, nzos_app_id, nzos_strings} = require("./nzos");
-var {telegram_handlers, telegram_app_id, telegram_strings} = require("./telegram");
 
 var latencyAppId = "amzn1.ask.skill.43994ac0-16d2-4804-8dd1-2beba59fba43";
 var videoAppId = "amzn1.ask.skill.c8e79877-8278-4628-8076-4b7ed6b8bfef";
+var presentations_app_id = "amzn1.ask.skill.bcaf523d-4c04-450f-9f6b-20c40c5ec1d8";
+var telegram_app_id = "amzn1.ask.skill.3b6b0006-cc5a-4332-bce4-b606481e576a";
 
 exports.handler = function (event, context) {
     console.log(JSON.stringify(event));
@@ -47,8 +47,9 @@ exports.handler = function (event, context) {
         case telegram_app_id:
             app = "telegram";
             alexa.appId = telegram_app_id;
-            alexa.resources = telegram_strings;
-            alexa.registerHandlers(telegram_handlers);
+            alexa.resources = nzos_strings;
+            alexa.registerHandlers(nzos_handlers);
+            context.appName = "telegram";
         break;
         case latencyAppId:
             app = "Test App";
