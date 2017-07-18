@@ -1,76 +1,57 @@
 var net = require('net');
 var nzappapi =  require('./nzappapi.js');
 
-var transactions = [];
 var initialized = false;
-var connected = false;
+var transactions = [];
+module.exports.startClient = function(addr, port, cb) {
 
-// This is code is required for AWS lambda 
-module.exports.startClient = function(cb) {
-  // If we are still connected - simply call the callback.
-  if (nzappapi.isConnected()) return cb();
-  
   if (!initialized) {
-    console.log(`starting client to ${process.env.MGR_IP}:${process.env.MGR_PORT}`);
     nzappapi.Initialize(
       "./nzappapi.proto", 
-      {type: "tcp", constructor: net.Socket, host: process.env.MGR_IP, port: process.env.MGR_PORT},
       {
         AppCommandResp: AppCommandResp
-      },
-      {
-        // On open call the callback
-        onOpen: () => {connected = true; if (cb) cb();},
-        onClose: () => (connected = false),
-        onError: () => (connected = false)
       });
-      initialized = true;
-  } else {
-    // Re-establish connection
-    nzappapi.connect({
-        onOpen: () => {connected = true; if (cb) cb();},
-        onClose: () => (connected = false),
-        onError: () => (connected = false)
-      });
+      
+    initialized = true;  
   }
+  
+  nzappapi.connect({type: "tcp", constructor: net.Socket, host: addr, port: port},
+    {
+      onOpen: (handle) => { if (cb) cb(null, handle);},
+      onClose: () => { if (cb) cb("Manager is unavailable"); },
+      onError: () => { if (cb) cb("Manager is unavailable"); }
+    }
+  );
+  
 };
 
-module.exports.checkConnection = function(emitter) {
-  console.log(`Connected: ${connected}`);
-  if (!connected) {
-    emitter.emit(":tell", "No connection to application manager");
-    return false;
-  }  
-  return true;
-};
-
-module.exports.command = function(user, device, app, sessionId, intent, ...rest) {
+module.exports.command = function(handle, user, device, app, sessionId, intent, ...rest) {
   let cb;
   if (rest.length > 0 && typeof rest[rest.length - 1] === "function") {
     cb = rest.pop();
   }
 
-  nzappapi.AppCommandReq(user, device, app, sessionId, intent, 
+  nzappapi.AppCommandReq(handle, user, device, app, sessionId, intent, 
     rest[0] || "", rest[1] || "", rest[2] || "", rest[3] || "");
     
   if (cb) {
     let t = {
       sessionId,
-      timer: setInterval(() => AppCommandResp(2, sessionId, "", ""), 2000),
+      timer: setTimeout(() => AppCommandResp(sessionId, "tell", "No response from application"), 2000),
       f: cb
     };
     transactions.push(t);
   }
 };
 
-var AppCommandResp = function(status, sessionId, response, parm) {
-  console.log(`AppCommandResp: (${status}, ${sessionId}, ${response}, ${parm})`);
+var AppCommandResp = function(sessionId, responseType, response) {
+  console.log(`AppCommandResp: (${sessionId}, ${responseType}, ${response})`);
   for (var i = 0; i < transactions.length; i++) {
     let t = transactions[i];
     if (t.sessionId === sessionId) {
-       clearInterval(t.timer);
+       clearTimeout(t.timer);
        transactions.splice(i, 1);
-       t.f(status, sessionId, response, parm);
+       t.f(sessionId, responseType, response);
        break;
     }
   }

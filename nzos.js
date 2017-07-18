@@ -6,8 +6,7 @@
 'use strict';
 
 const {
-  command,
-  checkConnection
+  command
 } = require('./managerIf');
 
 const nzos_app_id = "amzn1.ask.skill.d59e4dcf-92b7-4c4f-9ecc-ec93623a4d17";
@@ -27,13 +26,30 @@ const nzos_strings = {
   'en-US': en
 };
 
+function slotValue(slot, useId){
+    let value = slot.value;
+    let resolution = (slot.resolutions && 
+                      slot.resolutions.resolutionsPerAuthority && 
+                      slot.resolutions.resolutionsPerAuthority.length > 0) ? slot.resolutions.resolutionsPerAuthority[0] : null;
+    if(resolution && resolution.status.code == 'ER_SUCCESS_MATCH'){
+        let resolutionValue = resolution.values[0].value;
+        value = resolutionValue.id && useId ? resolutionValue.id : resolutionValue.name;
+    }
+    return value;
+}
+
 function emitResponse(alexa, response, defaultResponse, parm, defaultParm) {
-  response = ":" + (response !== "" ? response : defaultResponse)
+  response = ":" + (response !== "" ? response : defaultResponse);
   parm = parm !== "" ? parm : defaultParm;
 
   console.log(`emitReponse ${response}, ${parm}`);
 
   alexa.emit(response, parm);
+}
+
+function getUserId(session, context) {
+  return context.accessToken ? context.accessToken :
+    (session.user.accessToken ? session.user.accessToken : session.user.userId);
 }
 
 const nzos_handlers = {
@@ -45,20 +61,20 @@ const nzos_handlers = {
       // this.emit(':ask', `Welcome to ${this.context.appPrompt || this.context.appName}, open on which device?`);
     }
     else {
-      this.emit(':ask', 'Welcome to cloud OS, which APP would you like to launch, for example say "launch browser"?');
+      // this.emit(':ask', 'Welcome to cloud OS, which APP would you like to launch, for example say "launch browser"?');
     }
   },
 
   'Launch': function() {
     console.log(this.context.appName);
-    if (!checkConnection(this)) return;
     const {
       request,
       session
     } = this.event;
+    console.log(`User: ${JSON.stringify(session.user)}`);
     // Hardcode this here as LaunchRequest doesn't have
     const name = 'Launch';
-    const app = this.context.appName || request.intent.slots.App.value;
+    const app = this.context.appName || slotValue(request.intent.slots.App);
     let device = "";
     if (request.intent &&
       request.intent.slots.Device &&
@@ -74,45 +90,23 @@ const nzos_handlers = {
       this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
     else {
-      command(session.user.userId, device.toLowerCase(), app, session.sessionId, name.toLowerCase(),
+      command(this.context.handle, getUserId(session, this.context), device.toLowerCase(), app, session.sessionId, name.toLowerCase(),
         app,
-        function(status, sessionId, response, parm) {
-          switch (status) {
-            case 0:
-              emitResponse(this, response, "ask", parm, `Ok, ${app} launched`);
-              break;
-            case 1:
-              emitResponse(this, response, "ask", parm, `I don't recognize your identity, what is your username?`);
-              break;
-            case 2:
-              if (request.intent) {
-                var slotToElicit = 'Device';
-                var speechOutput = 'Start application on which device?';
-                var repromptSpeech = speechOutput;
-                this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-              }
-              else {
-                emitResponse(this, response, "ask", parm, `Please specify the target device?`);
-              }
-              break;
-            default:
-              emitResponse(this, response, "tell", parm, 'Failed to launch app');
-          }
-
+        function(sessionId, responseType, response) {
+          emitResponse(this, responseType, "ask", response, `Ok`);
         }.bind(this));
     }
   },
 
   'Move': function() {
     console.log(this.context.appName);
-    if (!checkConnection(this)) return;
     const {
       request,
       session
     } = this.event;
     const name = request.intent.name;
-    const app = this.context.appName || request.intent.slots.App.value;
-    let device = request.intent.slots.Device.value;
+    const app = this.context.appName || slotValue(request.intent.slots.App);
+    let device = slotValue(request.intent.slots.Device);
     if (!app) {
       let slotToElicit = 'App';
       let speechOutput = 'Which app would you like to move?';
@@ -126,33 +120,22 @@ const nzos_handlers = {
       this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
     else {
-      command(session.user.userId, device.toLowerCase(), app, session.sessionId, name.toLowerCase(),
+      command(this.context.handle, getUserId(session, this.context), device.toLowerCase(), app, session.sessionId, name.toLowerCase(),
         app,
-        function(status, sessionId, response, parm) {
-          switch (status) {
-            case 0:
-              emitResponse(this, response, "ask", parm, `Ok, Moved to ${device}`);
-              break;
-            case 1:
-              emitResponse(this, response, "ask", parm, `I don't recognize your identity, what is your username?`);
-              break;
-            default:
-              emitResponse(this, response, "tell", parm, 'Failed to move app');
-          }
-
+        function(sessionId, responseType, response) {
+          emitResponse(this, responseType, "ask", response, `Ok`);
         }.bind(this));
     }
   },
 
   'Close': function() {
     console.log(this.context.appName);
-    if (!checkConnection(this)) return;
     const {
       request,
       session
     } = this.event;
     const name = request.intent.name;
-    const app = this.context.appName || request.intent.slots.App.value;
+    const app = this.context.appName || slotValue(request.intent.slots.App);
     if (!app) {
       let slotToElicit = 'App';
       let speechOutput = 'Which app would you like to close?';
@@ -160,27 +143,16 @@ const nzos_handlers = {
       this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
     else {
-      command(session.user.userId, "", app, session.sessionId, name.toLowerCase(),
+      command(this.context.handle, getUserId(session, this.context), "", app, session.sessionId, name.toLowerCase(),
         app,
-        function(status, sessionId, response, parm) {
-          switch (status) {
-            case 0:
-              emitResponse(this, response, "tell", parm, `${app} closed`);
-              break;
-            case 1:
-              emitResponse(this, response, "ask", parm, `I don't recognize your identity, what is your username?`);
-              break;
-            default:
-              emitResponse(this, response, "tell", parm, 'Failed to close app');
-          }
-
+        function(sessionId, responseType, response) {
+          emitResponse(this, responseType, "ask", response, `Ok`);
         }.bind(this));
     }
   },
 
   'Identify': function() {
     console.log(this.context.appName);
-    if (!checkConnection(this)) return;
     const {
       request,
       session
@@ -194,27 +166,16 @@ const nzos_handlers = {
       this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
     else {
-      command(session.user.userId, "", appName, session.sessionId, name.toLowerCase(),
+      command(this.context.handle, getUserId(session, this.context), "", appName, session.sessionId, name.toLowerCase(),
         user.toLowerCase(),
-        function(status, sessionId, response, parm) {
-          switch (status) {
-            case 0:
-              emitResponse(this, response, "ask", parm, `User identity confirmed. Repeat your original request`);
-              break;
-            case 1:
-              emitResponse(this, response, "ask", parm, `I don't recognize your identity, what is your username?`);
-              break;
-            default:
-              emitResponse(this, response, "tell", parm, 'Failed to complete request');
-          }
-
+        function(sessionId, responseType, response) {
+          emitResponse(this, responseType, "ask", response, `Ok`);
         }.bind(this));
     }
   },
   
   'Unhandled': function() {
     console.log(this.context.appName);
-    if (!checkConnection(this)) return;
     const {
       request,
       session
@@ -223,7 +184,7 @@ const nzos_handlers = {
     console.log(`Unhandled - ${request.intent ? request.intent.name : 'no intent'}`);
 
     const name = request.intent.name;
-    const app = this.context.appName || (request.intent.slots.App ? request.intent.slots.App.value : undefined);
+    const app = this.context.appName || (request.intent.slots.App ? slotValue(request.intent.slots.App) : undefined);
 
     let device = "";
 
@@ -242,32 +203,25 @@ const nzos_handlers = {
       let params = [];
       const slots = request.intent.slots;
       if (slots) {
-        let keys = Object.keys(slots);
+        let keys = Object.keys(slots).sort((a,b) => (a < b) ? -1 : 1);
+        console.log(keys);
         keys.forEach((key) => {
-          if (key === "Device" && slots[key].value) {
-            device = slots[key].value;
+          if (key === "Device") {
+            device = slotValue(slots[key]) || "";
           }
           else if (key !== "App") {
-            params.push(slots[key].value);
+            params.push(slotValue(slots[key]));
           }
         });
       }
+      
+      console.log(params);
 
-      command(session.user.userId, device.toLowerCase(), app, session.sessionId, name.toLowerCase(),
+      command(this.context.handle, getUserId(session, this.context), device.toLowerCase(), app, session.sessionId, name.toLowerCase(),
         params[0] || "", params[1] || "", params[2] || "",
         params[3] || "", params[4] || "",
-        function(status, sessionId, response, parm) {
-          switch (status) {
-            case 0:
-              emitResponse(this, response, "ask", parm, "Ok");
-              break;
-            case 1:
-              emitResponse(this, response, "ask", parm, `I don't recognize your identity, what is your username?`);
-              break;
-            default:
-              emitResponse(this, response, "tell", parm, 'Failed to complete request');
-          }
-
+        function(sessionId, responseType, response) {
+          emitResponse(this, responseType, "ask", response, `Ok`);
         }.bind(this));
     }
   },
@@ -293,5 +247,6 @@ const nzos_handlers = {
 module.exports = {
   nzos_app_id,
   nzos_handlers,
-  nzos_strings
+  nzos_strings,
+  slotValue 
 };

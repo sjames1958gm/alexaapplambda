@@ -8,12 +8,11 @@
 
     var nzappapi = {};
 
-    var clientOptions = undefined;
     var root = undefined;
-    var cb = undefined;
-    var socket = undefined;
-    var connected = false;
     var initialized = false;
+    
+    var connections = {};
+    
     var Msgs = {};
     var MsgIds = {};
 
@@ -29,7 +28,7 @@
       var buffer = new Uint8Array(abuff);
       var value = 0;
       for (var i = offset; i < offset + 4; i++) {
-	       value = (value << 8) + buffer[i];
+               value = (value << 8) + buffer[i];
       }
       return value;
     }
@@ -38,79 +37,98 @@
     function writeUInt32(value, abuff, offset) {
       var buffer = new Uint8Array(abuff);
       for (var i = offset + 3; i >= offset; i--) {
-	       buffer[i] = value & 0xFF;
-	       value = value >> 8;
+               buffer[i] = value & 0xFF;
+               value = value >> 8;
       }
     }
 
     function append(abuff, data, offset) {
       var buffer = new Uint8Array(abuff);
       for (var i = 0; i < data.length; i++) {
-	       buffer[i + offset] = data[i];
+               buffer[i + offset] = data[i];
       }
     }
 
     function sendRpcMsg(obj) {
-      if (connected) {
+      if (obj.handle.connected) {
         var encodedBuffer = obj.buffer;
         var msgId = obj.msgId;
         var abuff = new ArrayBuffer(8 + encodedBuffer.length);
         writeUInt32(encodedBuffer.length, abuff, 0);
         writeUInt32(msgId, abuff, 4);
         append(abuff, encodedBuffer, 8);
-        if (clientOptions.type === "tcp") {
+        if (obj.handle.clientOptions.type === "tcp") {
           // console.log(Buffer.from(abuff));
-          socket.write(Buffer.from(abuff));
+          obj.handle.socket.write(Buffer.from(abuff));
         }
-        else {}
+        else {
+          // Websocket
+        }
         return true;
       } else {
         if (obj.retry > 0) {
           obj.retry--;
           setTimeout(sendRpcMsg, 50, obj);
         } else {
-          console.log("Cannot send App Message - no connection")
+          console.log("Cannot send App Message - no connection");
         }
       }
     }
 
-    nzappapi.isConnected = function() {
-        return connected;
-    }
-
-    nzappapi.connect = function(cb) {
-      if (!clientOptions) {
-        console.log("No options, exit");
+    nzappapi.connect = function(clientOptions, cbs) {
+      
+      let handle = connections[clientOptions.host + ":" + clientOptions.port];
+      
+      if (handle && handle.connected) 
+      {
+        handle.ts = Date.now();
+        // callback with asynchronous behavior.
+        if (cbs.onOpen)
+          setTimeout(() => cbs.onOpen(handle), 0);
+          
+        return;
       }
-      else if (clientOptions.type === "tcp") {
-        socket = new clientOptions.constructor();
+      
+      if (clientOptions.type === "tcp") {
+        let socket = new clientOptions.constructor();
+        
+        let handle = {
+          socket:socket,
+          cbs: cbs,
+          connected: false,
+          clientOptions: clientOptions,
+          ts: Date.now()
+        };
+        
+        connections[clientOptions.host + ":" + clientOptions.port] = handle;
+        
         socket.connect(clientOptions.port, clientOptions.host, function() {
-  	      console.log('Connected');
-          connected = true;
-          if (cb.onOpen) cb.onOpen();
+          console.log('Connected');
+          handle.connected = true;
+          if (handle.cbs.onOpen) handle.cbs.onOpen(handle);
         });
 
         socket.on("close", function () {
           console.log("Disconnected");
-          socket = undefined;
-          connected = false;
-          if (cb.onClose) 
-            socket = cb.onClose();
+          handle.connected = false;
+          if (handle.cbs.onClose)
+            handle.cbs.onClose();
+          
         });
-  
+
         socket.on("end", function () {
           console.log("Ended");
-          connected = false;
+          handle.connected = false;
         });
-  
+
         socket.on("error", function () {
           console.log("Error on connection");
-          connected = false;
-          if (cb.onError) cb.onError();
+          handle.connected = false;
+          if (handle.cbs.onError) 
+            handle.cbs.onError();
         });
-  
+
         let size = 0;
-        let save;
         socket.on("data", function (buffer) {
           try {
             // console.log(`On Data, buffer len: ${buffer.length}`);
@@ -122,7 +140,6 @@
                 // console.log("Full buffer");
                 processRpc(socket, size, buffer);
                 size = 0;
-                save = undefined;
               }
             }
             else {
@@ -135,8 +152,8 @@
         });
       }
       // todo websocket
-    
-    }
+
+    };
 
     function processRpc(socket, len, buffer) {
       var msgId = readUInt32(buffer, 0);
@@ -145,7 +162,7 @@
       // console.log(" msgId: ", msgId);
 
       // console.log(`MsgLen ${len}`);
-      // console.log(`MsgId ${msgId}`);
+                                           // console.log(`MsgId ${msgId}`);
       // console.log(`Buffer: ${buffer.length}`)
       var name = MsgIds[msgId];
       if (!name) {
@@ -170,8 +187,8 @@
       }
     }
 
-    function SendMessage(msgId, message, parms) {
-      var rest = Array.prototype.slice.call(arguments, 3);
+    function SendMessage(handle, msgId, message, parms) {
+      var rest = Array.prototype.slice.call(arguments, 4);
       if (initialized) {
         // console.log(rest);
         // console.log(parms);
@@ -183,7 +200,7 @@
         // console.log(m);
         var buffer = message.encode(m).finish();
         // console.log(buffer);
-        return sendRpcMsg({ buffer:buffer, msgId:msgId, retry: 5 });
+        return sendRpcMsg({ handle:handle, buffer:buffer, msgId:msgId, retry: 5 });
       } else {
         throw "API not intialized";
       }
@@ -194,7 +211,7 @@
     //-----------------------------------------------------
 
     function LoadProtocol(callbacks) {
-      // Load messages from proto file create functions
+                      // Load messages from proto file create functions
       Protocol.messages.forEach(function(m, i) {
         var id = Protocol.baseMsgId + 1 + i;
         var message = root.lookup(Protocol.namespace + "." + m.name);
@@ -214,10 +231,10 @@
 
         // Create the message sending functions
         nzappapi[m.name] = function(msgId, message, parms) {
-          return function() {
-            
-            var p = [msgId, message, parms];
-            for (var i = 0; i < arguments.length; i++) {
+          return function(handle) {
+
+            var p = [handle, msgId, message, parms];
+            for (var i = 1; i < arguments.length; i++) {
               p.push(arguments[i]);
             }
             SendMessage.apply(null, p);
@@ -226,28 +243,28 @@
       });
     }
 
-    nzappapi.Initialize = function (protofile, options, callbacks, conncallbacks) {
-      conncallbacks = conncallbacks || {};
-      cb = callbacks;
-      clientOptions = options;
+    nzappapi.Initialize = function (protofile, callbacks) {
+      
+      // Start timer to clear idle sockets.
+      
       ProtoBuf.load(protofile, function(err, locroot) {
         if (err) throw err;
         root = locroot;
         LoadProtocol(callbacks);
-        nzappapi.connect(conncallbacks);
         initialized = true;
       });
     };
-   
+
     return nzappapi;
   }
 
   if (typeof require === 'function' &&
-    typeof module === 'object' && module &&
-    typeof exports === 'object' && exports)
+      typeof module === 'object' && module &&
+      typeof exports === 'object' && exports)
     module['exports'] = init(require("protobufjs"), require("./nzappapiproto.js"));
   else
     (global = global || {})["nzappapi"] =
       init(global["protobuf"], global["netzyn"]["nzappapiproto"]);
 
 } (this));
+
