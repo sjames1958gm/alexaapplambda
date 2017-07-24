@@ -5,6 +5,8 @@ var initialized = false;
 var transactions = [];
 module.exports.startClient = function(addr, port, cb) {
 
+  console.log(`startClient: ${addr}:${port}`);
+
   if (!initialized) {
     nzappapi.Initialize(
       "./nzappapi.proto", 
@@ -37,7 +39,7 @@ module.exports.command = function(handle, user, device, app, sessionId, intent, 
   if (cb) {
     let t = {
       sessionId,
-      timer: setTimeout(() => AppCommandResp(sessionId, "tell", "No response from application"), 2000),
+      timer: setTimeout(() => AppCommandResp(sessionId, "tell", "No response from application"), 4000),
       f: cb
     };
     transactions.push(t);
